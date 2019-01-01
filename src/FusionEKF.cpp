@@ -21,7 +21,7 @@ FusionEKF::FusionEKF() {
   R_laser_ = MatrixXd(2, 2);
   R_radar_ = MatrixXd(3, 3);
   H_laser_ = MatrixXd(2, 4);
-  Hj_ = MatrixXd(3, 4);
+  // Hj_ = MatrixXd(3, 4);
 
   //measurement covariance matrix - laser
   R_laser_ << 0.0225, 0,
@@ -36,14 +36,32 @@ FusionEKF::FusionEKF() {
    * TODO: Finish initializing the FusionEKF.
    * TODO: Set the process and measurement noises
    */
-
-
 }
 
 /**
  * Destructor.
  */
 FusionEKF::~FusionEKF() {}
+
+VectorXd state_to_measurement_radar(const VectorXd& x)
+{
+  VectorXd z_m(3);
+  
+  const double 
+    px = x(0),
+    py = x(1),
+    vx = x(2),
+    vy = x(3);
+
+  const double r = std::sqrt(px*px + py*py);
+
+  z_m(0) = r;
+  z_m(1) = std::atan2(px, py);
+  z_m(2) = (px*vx + py*vy) / r;
+
+  return z_m;
+
+}
 
 void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   /**
@@ -93,18 +111,14 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    * Update
    */
 
-  /**
-   * TODO:
-   * - Use the sensor type to perform the update step.
-   * - Update the state and covariance matrices.
-   */
-
   if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
     // TODO: Radar updates
-
+    auto calc_jacobian = [](Eigen::VectorXd state) { return CalculateJacobian(state); };
+    auto h = [](Eigen::VectorXd state) { return (state_to_measurement_radar(state)); };
+    ekf_.UpdateEKF(measurement_pack.raw_measurements_, h, calc_jacobian);
   } else {
     // TODO: Laser updates
-
+    ekf_.Update(measurement_pack.raw_measurements_);
   }
 
   // print the output

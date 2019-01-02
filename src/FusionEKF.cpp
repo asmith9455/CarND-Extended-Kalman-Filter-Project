@@ -55,13 +55,46 @@ VectorXd state_to_measurement_radar(const VectorXd& x)
 
   const double r = std::sqrt(px*px + py*py);
 
-  z_m(0) = r;
-  z_m(1) = std::atan2(px, py);
-  z_m(2) = (px*vx + py*vy) / r;
+  z_m(0) = r;                   //range (distance from origin)
+  z_m(1) = std::atan2(px, py);  //angle about the z axis (0 at +x axis)
+
+  if (r > 1e-10)
+  {
+    z_m(2) = (px*vx + py*vy) / r; //range rate
+  }
+  else
+  {
+    // the range rate is defined using the axis drawn between the radar and the target. when this distance is 0, the axis is undefined.
+    // in reality, this doesn't seem to make much sense - how can the radar and the object occupy the same space??
+    // we can, however, aim to estimate the range rate given the object's current velocity, which will enable robustness for testing 
+    // purposes, and perhaps also account for inaccurate measurements
+    // for example, if the speed is 0, we expect the 'range rate' to be 0.
+
+    if (std::sqrt(vx*vx + vy*vy) < 1e-10)
+    {
+      z_m(2) = 0.0;
+    }
+
+    // if the velocity is non \vec{0}, we need to do something more sophisticated.
+    // we can estimate the next axis or the previous axis, and perform the projection
+    // using this axis.
+    // with a linear projection, the amount of 'time' we project into the future doesn't much
+    // matter - just use 1 second to make it easier
+    // therefore, just use the speed as an approximation of the range rate at this time
+    // since the object is moving and has just passed over the radar, it's range rate will
+    // jump from being highly negative to being highly positive (ex. -10 to +10).
+    // this is a problem...
+    else
+    {
+      z_m(2) = std::sqrt(vx*vx + vy*vy);
+    }
+
+  }
 
   return z_m;
-
 }
+
+
 
 void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   /**
@@ -75,22 +108,65 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
      */
 
     // first measurement
-    cout << "EKF: " << endl;
-    ekf_.x_ = VectorXd(4);
-    ekf_.x_ << 1, 1, 1, 1;
+    // cout << "EKF: " << endl;
+    
+    VectorXd x(4);
+    x << 0, 0, 0, 0;
+    MatrixXd P(4,4);
+    P <<  10,0,0,0,
+          0, 10, 0, 0,
+          0, 0, 10, 0,
+          0, 0, 0, 10;
+
+    MatrixXd F(4,4);
+
+    const double dt = 0.02;
+
+    F <<  1, 0, dt, 0,
+          0, 1, 0, dt,
+          0, 0, 1, 0,
+          0, 0, 0, 1;
+
+    MatrixXd H(1,1), R(1,1); //these will be initialized later depending on which sensor comes in
+
+    H << 0;
+    R << 0;
+
+    MatrixXd Q(4,4);
+
+    Q << 0.1,0,0,0,
+          0,0.1,0,0,
+          0,0,0.1,0,
+          0,0,0,0.1;
+
+    ekf_.Init(x,P,F,H,R,Q);
 
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
       // TODO: Convert radar from polar to cartesian coordinates 
       //         and initialize state.
-
+      const double 
+        range = measurement_pack.raw_measurements_(0),
+        z_angle = measurement_pack.raw_measurements_(1),
+        range_rate = measurement_pack.raw_measurements_(2);
+      
+      ekf_.x_(0) = range * std::cos(z_angle);
+      ekf_.x_(1) = range * std::sin(z_angle);
     }
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
+      return;
       // TODO: Initialize state.
+      const double 
+        px = measurement_pack.raw_measurements_(0),
+        py = measurement_pack.raw_measurements_(1);
 
+      ekf_.x_(0) = px;
+      ekf_.x_(1) = py;
+      
     }
 
     // done initializing, no need to predict or update
     is_initialized_ = true;
+    previous_timestamp_ = measurement_pack.timestamp_;
     return;
   }
 
@@ -105,7 +181,42 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */
 
+  // update F and Q based on new dt
+
+  const double var_ax = 9; //noise_ax = std_dev_ax * std_dev_ax
+  const double var_ay = 9;
+
+  MatrixXd Q(4,4);
+
+  const double 
+    dt = static_cast<double>(measurement_pack.timestamp_ - previous_timestamp_) * 1e-9,
+    dt2 = dt * dt,
+    dt3 = dt2 * dt,
+    dt4 = dt3 * dt;
+
+  
+
+  Q <<  dt4*0.25*var_ax,0,dt3*0.5*var_ax,0,
+        0,dt4*0.25*var_ay,0,dt3*0.5*var_ay,
+        dt3*0.5*var_ax,0,dt2*var_ax,0,
+        0,dt3*0.5*var_ay,0,dt2*var_ay;
+
+  MatrixXd F(4,4);
+
+  F <<  1, 0, dt, 0,
+        0, 1, 0, dt,
+        0, 0, 1, 0,
+        0, 0, 0, 1;
+
+  ekf_.F_ = F;
+
   ekf_.Predict();
+
+  std::cout << "\n\n\nafter prediction (time difference is: " << dt << " seconds): " << std::endl;
+  cout << "x_ = " << ekf_.x_ << endl;
+  cout << "P_ = " << ekf_.P_ << endl;
+
+  validate(ekf_.x_);
 
   /**
    * Update
@@ -113,15 +224,56 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
   if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
     // TODO: Radar updates
-    auto calc_jacobian = [](Eigen::VectorXd state) { return CalculateJacobian(state); };
-    auto h = [](Eigen::VectorXd state) { return (state_to_measurement_radar(state)); };
-    ekf_.UpdateEKF(measurement_pack.raw_measurements_, h, calc_jacobian);
+
+    ekf_.R_ = R_radar_.block(0,0,2,2);
+    MatrixXd H(2,4);
+
+    H <<  1, 0, 0, 0,
+          0, 1, 0, 0;
+
+    ekf_.H_ = H;
+
+    VectorXd pseudo_z(2);
+
+    pseudo_z(0) = measurement_pack.raw_measurements_(0) * std::cos(measurement_pack.raw_measurements_(1));
+    pseudo_z(1) = measurement_pack.raw_measurements_(0) * std::sin(measurement_pack.raw_measurements_(1));
+
+    ekf_.Update(pseudo_z);
+
+    // auto calc_jacobian = [](Eigen::VectorXd state) { return CalculateJacobian(state); };
+    // auto h = [](Eigen::VectorXd state) { return (state_to_measurement_radar(state)); };
+    // ekf_.UpdateEKF(measurement_pack.raw_measurements_, h, calc_jacobian);
+    validate(ekf_.x_);
   } else {
     // TODO: Laser updates
+
+    MatrixXd H(2,4);
+
+    H <<  1, 0, 0, 0,
+          0, 1, 0, 0;
+
+    ekf_.H_ = H;
+    ekf_.R_ = R_laser_;
+
     ekf_.Update(measurement_pack.raw_measurements_);
   }
 
+  std::string sensor_type_string;
+  
+  switch (measurement_pack.sensor_type_)
+  {
+    case(MeasurementPackage::LASER):
+      sensor_type_string = "LASER";
+      break;
+    case(MeasurementPackage::RADAR):
+      sensor_type_string = "RADAR";
+      break;
+  }
+
   // print the output
+  std::cout << "after measurement update with :" << sensor_type_string << std::endl;
   cout << "x_ = " << ekf_.x_ << endl;
   cout << "P_ = " << ekf_.P_ << endl;
+
+  validate(ekf_.x_);
 }

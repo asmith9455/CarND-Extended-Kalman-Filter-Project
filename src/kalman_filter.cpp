@@ -1,6 +1,7 @@
 #include "kalman_filter.h"
 #include <cmath>
 #include "tools.h"
+#include <iostream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -44,6 +45,11 @@ void KalmanFilter::Update(const VectorXd &z) {
 
 void KalmanFilter::UpdateEKF(const VectorXd &z, std::function<VectorXd(VectorXd)> h, std::function<MatrixXd(VectorXd)> calc_jacobian) {
   
+  validate(z);
+  validate(h(x_));
+
+  const auto x_meas_sp = h(x_);
+
   const MatrixXd y = z - h(x_);
 
   //compute Hj (jacobian)
@@ -53,7 +59,19 @@ void KalmanFilter::UpdateEKF(const VectorXd &z, std::function<VectorXd(VectorXd)
   const MatrixXd S = Hj * P_ * Hj.transpose() + R_;
   const MatrixXd K = P_ * Hj.transpose() * S.inverse();
 
-  x_ = x_ + K * y;
+  validate(x_);
+  validate(y);
+
+  const auto ky = K * y;
+
+  x_ = x_ + ky;
+
+  std::cout << "K is: " << K << std::endl;
+
+  validate(x_);
+
   P_ = (Eigen::MatrixXd::Identity(4,4) - K * Hj) * P_;
+
+  validate(x_);
 
 }

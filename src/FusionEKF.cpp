@@ -180,8 +180,12 @@ void FusionEKF::Predict(long long new_timestamp)
 {
 
   //params for q matrix
-  const double var_ax = 1; //noise_ax = std_dev_ax * std_dev_ax
-  const double var_ay = 1;
+  const double var_ax = 1e1; //noise_ax = std_dev_ax * std_dev_ax
+  const double var_ay = 1e1;
+
+  //1e-5 //acceleration not modelled well enough
+  //solution
+  //1e2 // can't even see estimates in the simulator
 
   MatrixXd Q(4, 4);
 

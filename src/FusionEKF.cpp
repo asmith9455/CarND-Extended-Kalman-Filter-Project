@@ -134,7 +134,7 @@ void FusionEKF::InitializeFromMeasurement(const MeasurementPackage &measurement_
     const double
         range = measurement_pack.raw_measurements_(0),
         z_angle = measurement_pack.raw_measurements_(1);
-        //range_rate = measurement_pack.raw_measurements_(2); //is there a way to use the range rate to initialize the speed of the KF?
+    //range_rate = measurement_pack.raw_measurements_(2); //is there a way to use the range rate to initialize the speed of the KF?
 
     ekf_.x_(0) = range * std::cos(z_angle);
     ekf_.x_(1) = range * std::sin(z_angle);
@@ -185,13 +185,15 @@ void FusionEKF::Predict(long long new_timestamp)
 
   //1e-5 //acceleration not modelled well enough
   //...
-  //1e0 // works ok but not great (.1786, 0.1527, .7320, .6670 ) 
+  //1e0 // works ok but not great (.1786, 0.1527, .7320, .6670 )
   //5e0 (0.1211, 0.1032, 0.5957, 0.4900)
   //9e0 (0.1153, 0.1023, 0.5832, 0.4687)
   //solution
   //1e1 (0.1148, 0.1027 0.5833, 0.4679) BEST SO FAR
   //2e1 (.1144, .1076, .6036, .4881)
   //1e2 // can't even see estimates in the simulator
+
+  //using the true values of the standard deviation of ax, ay doesn't work well.
 
   MatrixXd Q(4, 4);
 

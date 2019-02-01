@@ -25,13 +25,15 @@ FusionEKF::FusionEKF()
   // Hj_ = MatrixXd(3, 4);
 
   //measurement covariance matrix - laser
-  R_laser_ << 0.0225, 0,
-      0, 0.0225;
+  // R_laser_ << 0.0225, 0,
+  //     0, 0.0225;
+  R_laser_ << 0.0076, 0,
+      0, 0.0078;
 
   //measurement covariance matrix - radar
-  R_radar_ << 0.09, 0, 0,
-      0, 0.0009, 0,
-      0, 0, 0.09;
+  R_radar_ << 0.056, 0, 0,
+      0, 0.116, 0,
+      0, 0, 0.029;
 
   /**
    * TODO: Finish initializing the FusionEKF.
@@ -101,8 +103,8 @@ void FusionEKF::InitializeFromMeasurement(const MeasurementPackage &measurement_
   MatrixXd P(4, 4);
   P << 10, 0, 0, 0,
       0, 10, 0, 0,
-      0, 0, 10, 0,
-      0, 0, 0, 10;
+      0, 0, 100, 0,
+      0, 0, 0, 100;
 
   MatrixXd F(4, 4);
 
@@ -178,8 +180,8 @@ void FusionEKF::Predict(long long new_timestamp)
 {
 
   //params for q matrix
-  const double var_ax = 9; //noise_ax = std_dev_ax * std_dev_ax
-  const double var_ay = 9;
+  const double var_ax = 1; //noise_ax = std_dev_ax * std_dev_ax
+  const double var_ay = 1;
 
   MatrixXd Q(4, 4);
 
@@ -207,7 +209,7 @@ void FusionEKF::Predict(long long new_timestamp)
       0, 0, 0, 1;
 
   ekf_.F_ = F;
-  // ekf_.Q_ = Q;
+  ekf_.Q_ = Q;
 
   ekf_.Predict();
 

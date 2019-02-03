@@ -27,13 +27,18 @@ FusionEKF::FusionEKF()
   //measurement covariance matrix - laser
   // R_laser_ << 0.0225, 0,
   //     0, 0.0225;
-  R_laser_ << 0.0076, 0,
-      0, 0.0078;
+  // R_laser_ << 0.0076, 0,
+  //     0, 0.0078;
+  R_laser_ << 0.01, 0,
+      0, 0.01;
 
   //measurement covariance matrix - radar
-  R_radar_ << 0.056, 0, 0,
-      0, 0.116, 0,
-      0, 0, 0.04;
+  // R_radar_ << 0.056, 0, 0,
+  //     0, 0.116, 0,
+  //     0, 0, 0.029;
+  R_radar_ << 100.0, 0, 0,
+      0, 100.0, 0,
+      0, 0, 0.029;
 
   /**
    * TODO: Finish initializing the FusionEKF.
@@ -179,9 +184,11 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack)
 void FusionEKF::Predict(long long new_timestamp)
 {
 
+  //should we adjust the noisyness to be larger at the beginning and smaller
+
   //params for q matrix
-  const double var_ax = 9e0; //noise_ax = std_dev_ax * std_dev_ax
-  const double var_ay = 9e0;
+  const double var_ax = 3.5e0; //noise_ax = std_dev_ax * std_dev_ax
+  const double var_ay = 4e0;
 
   //1e-5 //acceleration not modelled well enough
   //...

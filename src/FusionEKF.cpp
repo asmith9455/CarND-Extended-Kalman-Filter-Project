@@ -33,7 +33,7 @@ FusionEKF::FusionEKF()
   //measurement covariance matrix - radar
   R_radar_ << 0.056, 0, 0,
       0, 0.116, 0,
-      0, 0, 0.029;
+      0, 0, 0.04;
 
   /**
    * TODO: Finish initializing the FusionEKF.

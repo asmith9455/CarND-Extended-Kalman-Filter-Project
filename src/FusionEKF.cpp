@@ -143,6 +143,8 @@ void FusionEKF::InitializeFromMeasurement(const MeasurementPackage &measurement_
 
     ekf_.x_(0) = range * std::cos(z_angle);
     ekf_.x_(1) = range * std::sin(z_angle);
+    ekf_.P_(0,0) = R_radar_(0,0);
+    ekf_.P_(1,1) = R_radar_(1,1);
   }
   else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER)
   {
@@ -152,6 +154,8 @@ void FusionEKF::InitializeFromMeasurement(const MeasurementPackage &measurement_
 
     ekf_.x_(0) = px;
     ekf_.x_(1) = py;
+    ekf_.P_(0,0) = R_laser_(0,0);
+    ekf_.P_(1,1) = R_laser_(1,1);
   }
 }
 

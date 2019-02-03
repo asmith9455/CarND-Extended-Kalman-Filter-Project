@@ -245,24 +245,35 @@ void FusionEKF::Update(const MeasurementPackage &measurement_pack)
 
     // ++limiter;
 
-    ekf_.R_ = R_radar_.block(0, 0, 2, 2);
-    MatrixXd H(2, 4);
+    bool use_EKF = true;
 
-    H << 1, 0, 0, 0,
-        0, 1, 0, 0;
+    if (use_EKF)
+    {
+      ekf_.R_ = R_radar_;
 
-    ekf_.H_ = H;
+      auto calc_jacobian = [](Eigen::VectorXd state) { return CalculateJacobian(state); };
+      auto h = [](Eigen::VectorXd state) { return (state_to_measurement_radar(state)); };
+      ekf_.UpdateEKF(measurement_pack.raw_measurements_, h, calc_jacobian);
+    }
+    else
+    {
+      ekf_.R_ = R_radar_.block(0, 0, 2, 2);
+      MatrixXd H(2, 4);
 
-    VectorXd pseudo_z(2);
+      H << 1, 0, 0, 0,
+          0, 1, 0, 0;
 
-    pseudo_z(0) = measurement_pack.raw_measurements_(0) * std::cos(measurement_pack.raw_measurements_(1));
-    pseudo_z(1) = measurement_pack.raw_measurements_(0) * std::sin(measurement_pack.raw_measurements_(1));
+      ekf_.H_ = H;
 
-    ekf_.Update(pseudo_z);
+      VectorXd pseudo_z(2);
 
-    // auto calc_jacobian = [](Eigen::VectorXd state) { return CalculateJacobian(state); };
-    // auto h = [](Eigen::VectorXd state) { return (state_to_measurement_radar(state)); };
-    // ekf_.UpdateEKF(measurement_pack.raw_measurements_, h, calc_jacobian);
+      pseudo_z(0) = measurement_pack.raw_measurements_(0) * std::cos(measurement_pack.raw_measurements_(1));
+      pseudo_z(1) = measurement_pack.raw_measurements_(0) * std::sin(measurement_pack.raw_measurements_(1));
+
+      ekf_.Update(pseudo_z);
+    }
+
+
     validate(ekf_.x_);
 
     std::cout << "-------------------------------------------------------------------" << std::endl;
